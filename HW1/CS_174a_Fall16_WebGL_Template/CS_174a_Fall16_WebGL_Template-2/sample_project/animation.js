@@ -54,7 +54,7 @@ function Animation()    // A class.  An example of a displayable object that our
     self.m_prism       = new Prism( 8, 8 );
     self.m_cube        = new Cube();
     self.m_obj         = new Shape_From_File( "teapot.obj", scale( .1, .1, .1 ) );
-    self.m_sub         = new Subdivision_Sphere( 4, true );
+    self.m_sub         = new Subdivision_Sphere( 4, false );
     self.m_axis        = new Axis();
 		
 // 1st parameter is our starting camera matrix.  2nd parameter is the projection:  The matrix that determines how depth is treated.  It projects 3D points onto a plane.
@@ -174,8 +174,8 @@ Animation.prototype.display = function(time)
     this.graphicsState.lights = [];                    // First clear the light list each frame so we can replace & update lights.
     
     var light_orbit = [ Math.cos(this.graphicsState.animation_time/1000), Math.sin(this.graphicsState.animation_time/1000) ];
-    this.graphicsState.lights.push( new Light( vec4(  30 * light_orbit[0],  30*light_orbit[1],  34 * light_orbit[0], 1 ), Color( 0, .4, 0, 1 ), 100000 ) );
-    this.graphicsState.lights.push( new Light( vec4( -10 * light_orbit[0], -20*light_orbit[1], -14 * light_orbit[0], 0 ), Color( 1, 1, .3, 1 ), 100 * Math.cos(this.graphicsState.animation_time/10000 ) ) );
+    this.graphicsState.lights.push( new Light( vec4(  30 * light_orbit[0],  30*light_orbit[1],  34 * light_orbit[0], 1 ), Color( .9, .8, .8, 1 ), 100000 ) );
+    this.graphicsState.lights.push( new Light( vec4( -10 * light_orbit[0], -20*light_orbit[1], -14 * light_orbit[0], 0 ), Color( 1, 1, .3, 1 ), 10000 * Math.cos(this.graphicsState.animation_time/10000 ) ) );
     
 		// *** Materials: *** Declare new ones as temps when needed; they're just cheap wrappers for some numbers.
 		// 1st parameter:  Color (4 floats in RGBA format), 2nd: Ambient light, 3rd: Diffuse reflectivity, 4th: Specular reflectivity, 5th: Smoothness exponent, 6th: Texture image.
@@ -187,29 +187,192 @@ Animation.prototype.display = function(time)
 		/**********************************
 		Start coding down here!!!!
 		**********************************/                                     // From this point on down it's just some examples for you -- feel free to comment it all out.
-
-    model_transform = mult( model_transform, translation( 0, 10, -15) );		// Position the next shape by post-multiplying another matrix onto the current matrix product
+    /*
+    //model_transform = mult( model_transform, translation( 0, 10, -15) );		// Position the next shape by post-multiplying another matrix onto the current matrix product
        
-  //  Uncomment the next line if you want to see an example scene:     
-    model_transform = this.test_lots_of_shapes( model_transform );  // An example of how to call other functions that you write, delegating work out to them, while keeping intact the concept 
+    //  Uncomment the next line if you want to see an example scene:     
+    //model_transform = this.test_lots_of_shapes( model_transform );  // An example of how to call other functions that you write, delegating work out to them, while keeping intact the concept 
                                                                       // of a "current model transform matrix".  Whatever it does internally to model_transform's state persists afterward.
     
     //this.m_cube.draw( this.graphicsState, model_transform, greyPlastic );   // Cube example.  (Issue a command to draw one.)
      
-    model_transform = mult( model_transform, translation( 0, -6, 0 ) );		
-    CURRENT_BASIS_IS_WORTH_SHOWING( this, model_transform);                 // How to draw a set of axes.  Only the selected one is drawn - cycle through them by pressing p and m.
+    //model_transform = mult( model_transform, translation( 0, -6, 0 ) );		
+    //CURRENT_BASIS_IS_WORTH_SHOWING( this, model_transform);                 // How to draw a set of axes.  Only the selected one is drawn - cycle through them by pressing p and m.
+
+   
     
-    model_transform = mult( model_transform, translation( 0, -3, 0 ) );											                // Example Translate
-    model_transform = mult( model_transform, rotation( this.graphicsState.animation_time/20, 0, 1, 0 ) );		// Example Rotate. 1st parameter is scalar for angle, last three are axis of rotation.
-    model_transform = mult( model_transform, scale( 4, 1 , 4 ) );												                    // Example Scale
+    //model_transform = mult( model_transform, translation( 0, -3, 0 ) );											                // Example Translate
+    //model_transform = mult( model_transform, rotation( this.graphicsState.animation_time/20, 0, 1, 0 ) );		// Example Rotate. 1st parameter is scalar for angle, last three are axis of rotation.
+    //model_transform = mult( model_transform, scale( 4, 1 , 4 ) );												                    // Example Scale
     
-    this.m_strip.draw( this.graphicsState, model_transform, greyPlastic );	// Rectangle example.  (Issue a command to draw one.)  Notice the effect of the 3 previous lines.
-    CURRENT_BASIS_IS_WORTH_SHOWING( this, model_transform);                 // Show another axis right where the rectangle is placed.
+    //this.m_strip.draw( this.graphicsState, model_transform, greyPlastic );	// Rectangle example.  (Issue a command to draw one.)  Notice the effect of the 3 previous lines.
+    //CURRENT_BASIS_IS_WORTH_SHOWING( this, model_transform);                 // Show another axis right where the rectangle is placed.
     CURRENT_BASIS_IS_WORTH_SHOWING( this, mat4() );                         // Show another axis placed at the world origin
     
-    /*
+    
     shaders[ "Demo_Shader" ].activate();
     model_transform = mult( model_transform, translation( 0, -2, 0 ) );
     this.m_sub.draw( this.graphicsState, model_transform, earth );     // Sphere example.  (Issue a command to draw one.)  Notice that we're still in the rectangle's warped coordinate system.
     */
-	}	
+
+    //model_transform = this.drawSnowman( mult(mult( model_transform, translation( 0, 10, 0)), scale(.5, .5, .5)) );
+
+   
+
+     CURRENT_BASIS_IS_WORTH_SHOWING( this, mat4() );
+     model_transform = mult( model_transform, translation( 0, -10, 0 ) );      
+     CURRENT_BASIS_IS_WORTH_SHOWING( this, model_transform);  
+
+
+     model_transform = this.drawGround(model_transform);
+     // set the surface of the ground plane as the new base axis
+     model_transform = mult( model_transform, translation(0, 1, 0));
+     this.drawTree(model_transform, 8, 10);
+
+     //this.m_sphere.draw( this.graphicsState, model_transform, greyPlastic);
+
+     this.drawBee(model_transform, 4, 8, 2);
+    
+}	
+
+Animation.prototype.drawGround = function(model_transform){
+     var greenGround = new Material(Color(.2, .5, .3, 1), .1, 1, 1, 40);
+  
+     var stack = [];
+     stack.push(model_transform);
+     model_transform = mult(model_transform, scale(100, 1, 100));
+     this.m_cube.draw( this.graphicsState, model_transform, greenGround); 
+
+     model_transform = stack.pop();
+     
+     return model_transform;
+}
+
+Animation.prototype.drawTree = function(model_transform, numSegments, swayAngle){
+     var brownTrunk = new Material(Color(.7, .5, .3, 1), .1, 1, 1, 40);
+     var redFoliage = new Material(Color(.8, .1, .1, 1), .1, 1, 1, 40);
+
+     var stack = [];
+     stack.push(model_transform);
+
+     // create the base fixed trunk
+     model_transform = mult(model_transform, scale(.5, 1, .5));
+     this.m_cube.draw( this.graphicsState, model_transform, brownTrunk);
+     model_transform = stack.pop();
+    
+     //model transform to keep track of new coordinate of each trunk as it generates 
+     var trunk_model_transform = model_transform;
+
+     for (var i = 1; i < numSegments; i++){
+          trunk_model_transform = this.drawTrunkSegment(trunk_model_transform, swayAngle);    
+     }
+     trunk_model_transform = mult(trunk_model_transform, translation(0, 2, 0));
+     trunk_model_transform = mult(trunk_model_transform, scale(2, 2, 2));
+     this.m_sub.draw(this.graphicsState, trunk_model_transform, redFoliage);
+
+     return model_transform;
+}
+
+Animation.prototype.drawTrunkSegment = function(model_transform, swayAngle){
+     var brownTrunk = new Material(Color(.7, .5, .3, 1), .1, 1, 1, 40);
+     var stack = [];
+    
+     //translate the new axis model to half a length up and apply the rotation, this will be the 'base' of the new trunk, which also coincides with the top surface of the previous trunk
+     model_transform = mult(model_transform, translation(0, 0.5, 0));
+     model_transform = mult(model_transform, rotation( Math.sin(this.graphicsState.animation_time/3000)*swayAngle, 0, 0, -1 ) );
+     //CURRENT_BASIS_IS_WORTH_SHOWING( this, model_transform);
+     //we need another half a unit translate up so that the base of the new trunk rotates along the Z axis, instead of the center
+     model_transform = mult(model_transform, translation(0, 0.5, 0));
+    
+     
+     stack.push(model_transform);
+
+     model_transform = mult(model_transform, scale(.5, 1, .5));
+    
+     this.m_cube.draw( this.graphicsState, model_transform, brownTrunk);
+     model_transform = stack.pop(model_transform);
+     return model_transform;
+}
+
+Animation.prototype.drawBee = function(model_transform, height, radius, amplitude){
+     var greyPlastic = new Material( Color( .5,.5,.5,1 ), .01, .4, .2, 20 );
+     var purpleHead = new Material( Color( .5, .1, .5, 1), .1, 1, 1, 40);
+     var yellowAbdomen = new Material( Color(.9, .9, .1, 1), .1, 1, 1, 40);
+     var stack = [];
+
+     // set the model for the flight path of the bee and the amplitude
+     stack.push(model_transform);
+     model_transform = mult(model_transform, rotation( this.graphicsState.animation_time/50, 0, -1, 0 ) );
+     model_transform = mult(model_transform, translation(radius, height + Math.sin(this.graphicsState.animation_time/3000)*amplitude, 0));
+     //model_transform = mult(model_transform, translation(radius, height, 0));
+
+     var bodyLength = 2.5;
+
+     // draw the bee thorax
+     this.m_cube.draw( this.graphicsState, mult(model_transform, scale(1, 1, 2)), greyPlastic);
+
+
+     // draw the head
+     this.m_sub.draw(this.graphicsState, mult(mult(model_transform, translation(0, 0, 1.5)), scale(0.5, 0.5, 0.5)), purpleHead);
+
+     //draw the abdomen
+     this.m_sub.draw(this.graphicsState, mult(mult(model_transform, translation(0, 0, -3)), scale(1, 1, 2)), yellowAbdomen);
+
+     this.drawWings(model_transform);
+     this.drawLegPair(model_transform);
+     this.drawLegPair(mult(model_transform, translation(0, 0, -.4)));
+	this.drawLegPair(mult(model_transform, translation(0, 0, .4)));
+
+     model_transform = stack.pop(model_transform); 
+     return model_transform;
+}
+
+Animation.prototype.drawWings = function(model_transform){
+     var greyPlastic = new Material( Color( .5,.5,.5,1 ), .01, .4, .2, 20);
+
+     var stack = [];
+     stack.push(model_transform);
+
+     for( var i = -1; i <= 1; i += 2 )
+     {
+          stack.push(model_transform);
+          model_transform = mult( model_transform, translation( i*.5, .5, 0));
+          model_transform = mult( model_transform, rotation( i * 90, 0, 1, 0 ) );
+
+          model_transform = mult( model_transform, rotation(  Math.sin(this.graphicsState.animation_time/2000)*70, -1, 0, 0 ) );
+           CURRENT_BASIS_IS_WORTH_SHOWING( this, model_transform);
+          model_transform = mult( model_transform, translation( 0, .05, 1) );
+          model_transform = mult( model_transform, scale( 1, .1, 2 ) )
+
+          this.m_cube.draw( this.graphicsState, model_transform, greyPlastic );
+          model_transform = stack.pop();
+     }
+
+     model_transform = stack.pop();
+     return model_transform;
+}
+
+Animation.prototype.drawLegPair = function(model_transform){
+	var greyPlastic = new Material( Color( .5,.5,.5,1 ), .01, .4, .2, 20);
+
+     var stack = [];
+     stack.push(model_transform);
+
+     for( var i = -1; i <= 1; i += 2 )
+     {
+          stack.push(model_transform);
+          model_transform = mult( model_transform, translation( i*.5, -.5, 0));
+          model_transform = mult( model_transform, rotation( i * 90, 0, 1, 0 ) );
+
+          model_transform = mult( model_transform, rotation(  100 + Math.sin(this.graphicsState.animation_time/2500)*10, 1, 0, 0 ) );
+         	CURRENT_BASIS_IS_WORTH_SHOWING( this, model_transform);
+          model_transform = mult( model_transform, translation( 0, .1, .5) );
+          model_transform = mult( model_transform, scale( .2, .2, 1 ) )
+
+          this.m_cube.draw( this.graphicsState, model_transform, greyPlastic );
+          model_transform = stack.pop();
+     }
+
+     model_transform = stack.pop();
+     return model_transform;
+}

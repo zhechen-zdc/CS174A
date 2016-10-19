@@ -66,7 +66,7 @@ function GL_Context( canvas_id, background_color )
 		if ( !gl && canvas.parentNode ) canvas.parentNode.innerHTML = "Computer won't run WebGL - http://get.webgl.org/troubleshooting/ for help";
 		gl.getExtension("OES_element_index_uint");
 		
-		gl.clearColor( 0, 0, 0, 1 );	    // Tell the graphics card which background color to clear the canvas with each time we display()		  
+		gl.clearColor( 1, 1, 1, 1 );	    // Tell the graphics card which background color to clear the canvas with each time we display()		  
 		gl.viewport( 0, 0, canvas.width, canvas.height );
 		gl.enable(gl.DEPTH_TEST);
 		gl.enable( gl.BLEND );
