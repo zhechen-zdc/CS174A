@@ -227,10 +227,11 @@ Animation.prototype.display = function(time)
      model_transform = this.drawGround(model_transform);
      // set the surface of the ground plane as the new base axis
      model_transform = mult( model_transform, translation(0, 1, 0));
+
+     // draw the tree
      this.drawTree(model_transform, 8, 10);
 
-     //this.m_sphere.draw( this.graphicsState, model_transform, greyPlastic);
-
+     // draw the bee
      this.drawBee(model_transform, 4, 8, 2);
     
 }	
@@ -280,9 +281,10 @@ Animation.prototype.drawTrunkSegment = function(model_transform, swayAngle){
      //translate the new axis model to half a length up and apply the rotation, this will be the 'base' of the new trunk, which also coincides with the top surface of the previous trunk
      model_transform = mult(model_transform, translation(0, 0.5, 0));
      model_transform = mult(model_transform, rotation( Math.sin(this.graphicsState.animation_time/3000)*swayAngle, 0, 0, -1 ) );
-     //CURRENT_BASIS_IS_WORTH_SHOWING( this, model_transform);
      //we need another half a unit translate up so that the base of the new trunk rotates along the Z axis, instead of the center
+
      model_transform = mult(model_transform, translation(0, 0.5, 0));
+     CURRENT_BASIS_IS_WORTH_SHOWING( this, model_transform);
     
      
      stack.push(model_transform);
@@ -302,13 +304,18 @@ Animation.prototype.drawBee = function(model_transform, height, radius, amplitud
 
      // set the model for the flight path of the bee and the amplitude
      stack.push(model_transform);
+
+     // comment out these 2 lines to stop the circular and up and down motion of the bee
      model_transform = mult(model_transform, rotation( this.graphicsState.animation_time/50, 0, -1, 0 ) );
      model_transform = mult(model_transform, translation(radius, height + Math.sin(this.graphicsState.animation_time/3000)*amplitude, 0));
+
+     //comment out the previous 2 lines and uncomment this to look at the bee motion in a fixed location
      //model_transform = mult(model_transform, translation(radius, height, 0));
 
      var bodyLength = 2.5;
 
      // draw the bee thorax
+     CURRENT_BASIS_IS_WORTH_SHOWING( this, model_transform);
      this.m_cube.draw( this.graphicsState, mult(model_transform, scale(1, 1, 2)), greyPlastic);
 
 
@@ -319,9 +326,12 @@ Animation.prototype.drawBee = function(model_transform, height, radius, amplitud
      this.m_sub.draw(this.graphicsState, mult(mult(model_transform, translation(0, 0, -3)), scale(1, 1, 2)), yellowAbdomen);
 
      this.drawWings(model_transform);
-     this.drawLegPair(model_transform);
-     this.drawLegPair(mult(model_transform, translation(0, 0, -.4)));
-	this.drawLegPair(mult(model_transform, translation(0, 0, .4)));
+
+     // have the legs sway 10 degrees each way
+     var legSwayAngle = 10;
+     this.drawLegPair(model_transform, legSwayAngle);
+     this.drawLegPair(mult(model_transform, translation(0, 0, -.4)), legSwayAngle);
+	this.drawLegPair(mult(model_transform, translation(0, 0, .4)), legSwayAngle);
 
      model_transform = stack.pop(model_transform); 
      return model_transform;
@@ -333,16 +343,19 @@ Animation.prototype.drawWings = function(model_transform){
      var stack = [];
      stack.push(model_transform);
 
+     // draw the wings
      for( var i = -1; i <= 1; i += 2 )
      {
           stack.push(model_transform);
           model_transform = mult( model_transform, translation( i*.5, .5, 0));
           model_transform = mult( model_transform, rotation( i * 90, 0, 1, 0 ) );
 
+          // fix the axis of rotation to corner of the wings to corner of the body
           model_transform = mult( model_transform, rotation(  Math.sin(this.graphicsState.animation_time/2000)*70, -1, 0, 0 ) );
-           CURRENT_BASIS_IS_WORTH_SHOWING( this, model_transform);
+          
+          CURRENT_BASIS_IS_WORTH_SHOWING( this, model_transform);
           model_transform = mult( model_transform, translation( 0, .05, 1) );
-          model_transform = mult( model_transform, scale( 1, .1, 2 ) )
+         	model_transform = mult( model_transform, scale( 1, .1, 2 ) )
 
           this.m_cube.draw( this.graphicsState, model_transform, greyPlastic );
           model_transform = stack.pop();
@@ -352,24 +365,35 @@ Animation.prototype.drawWings = function(model_transform){
      return model_transform;
 }
 
-Animation.prototype.drawLegPair = function(model_transform){
+Animation.prototype.drawLegPair = function(model_transform, legSwayAngle){
 	var greyPlastic = new Material( Color( .5,.5,.5,1 ), .01, .4, .2, 20);
 
      var stack = [];
      stack.push(model_transform);
 
+     // draw each leg pair
      for( var i = -1; i <= 1; i += 2 )
      {
           stack.push(model_transform);
           model_transform = mult( model_transform, translation( i*.5, -.5, 0));
           model_transform = mult( model_transform, rotation( i * 90, 0, 1, 0 ) );
 
-          model_transform = mult( model_transform, rotation(  100 + Math.sin(this.graphicsState.animation_time/2500)*10, 1, 0, 0 ) );
-         	CURRENT_BASIS_IS_WORTH_SHOWING( this, model_transform);
-          model_transform = mult( model_transform, translation( 0, .1, .5) );
-          model_transform = mult( model_transform, scale( .2, .2, 1 ) )
+          model_transform = mult( model_transform, rotation(  100 + Math.sin(this.graphicsState.animation_time/1000)*legSwayAngle, 1, 0, 0 ) );
+         	model_transform = mult( model_transform, translation( 0, .1, .5) );
+          CURRENT_BASIS_IS_WORTH_SHOWING( this, model_transform);
 
-          this.m_cube.draw( this.graphicsState, model_transform, greyPlastic );
+          // draw the first leg
+          this.m_cube.draw( this.graphicsState, mult( model_transform, scale( .2, .2, 1 ) ), greyPlastic );
+
+          // move the basis to the end of the leg
+          model_transform = mult( model_transform, translation( 0, -.1, .5) );
+         
+         	//rotate the basis for the joint, then translate it so that the end of the leg joins the inner corner of the firs tleg
+          model_transform = mult( model_transform, rotation(10+ Math.sin(this.graphicsState.animation_time/1000)*legSwayAngle, 1, 0, 0 ) );
+          CURRENT_BASIS_IS_WORTH_SHOWING( this, model_transform);
+          model_transform = mult( model_transform, translation( 0, .1, .5) );
+          this.m_cube.draw( this.graphicsState, mult( model_transform, scale( .2, .2, 1 ) ), greyPlastic );
+          
           model_transform = stack.pop();
      }
 
