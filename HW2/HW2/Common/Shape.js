@@ -25,6 +25,11 @@ function initTexture(filename, bool_mipMap)
 					{	gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);	gl.generateMipmap(gl.TEXTURE_2D);	}
 				else
 						gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+
+				//clamp textures to edge to prevent seams
+				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+				gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
 				texture.loaded = true;
 			}
 		}	) (textures[filename], bool_mipMap);

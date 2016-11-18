@@ -26,11 +26,16 @@ var texture_filenames_to_load = [
      "stars.png", 
      "text.png", 
      "earth.gif", 
-     "custom_textures/earthmap.png",
+     "custom_textures/earthmap1k.jpg",
+     "custom_textures/moonmap.jpg",
+     "custom_textures/earthcloudmap.png",
      "custom_textures/copper.jpg",
      "custom_textures/steel.jpg",
+     "custom_textures/steel2.jpg",
      "custom_textures/marble.jpg",
-      "custom_textures/skybox-top.jpg",
+     "custom_textures/leaves.jpg",
+     "custom_textures/starfield.png",
+     "custom_textures/skybox-top.jpg",
      "custom_textures/skybox-front.jpg",
      "custom_textures/skybox-left.jpg",
      "custom_textures/skybox-right.jpg",
@@ -199,7 +204,7 @@ Animation.prototype.display = function(time)
           
           update_camera( this, this.animation_delta_time );
                
-          var model_transform = mat4();             // Reset this every frame.
+          var model_transform = mat4();             // Reset this every frame.s 
           this.basis_id = 0;                        // For the "axis" shape.  This variable uniquely marks each axis we draw in display() as it counts them up.
     
     shaders[ "Default" ].activate();                         // Keep the flags seen by the default shader program up-to-date
@@ -211,18 +216,14 @@ Animation.prototype.display = function(time)
     this.graphicsState.lights = [];                    // First clear the light list each frame so we can replace & update lights.
     
     var light_orbit = [ Math.cos(this.graphicsState.animation_time/5000), Math.sin(this.graphicsState.animation_time/5000) ];
-    this.graphicsState.lights.push( new Light( vec4(  30 * light_orbit[0],  30*light_orbit[1],  34 * light_orbit[0], 1 ), Color( .9, .8, .8, 1 ), 100000 ) );
-    this.graphicsState.lights.push( new Light( vec4( -10 * light_orbit[0], -20*light_orbit[1], -14 * light_orbit[0], 0 ), Color( 1, 1, .3, 1 ), 10000 * Math.cos(this.graphicsState.animation_time/10000 ) ) );
+    this.graphicsState.lights.push( new Light( vec4(  300 * light_orbit[0],  300*light_orbit[1],  340 * light_orbit[0], 1 ), Color( .4, .6, 1, 1 ), 100000 ) );
+    this.graphicsState.lights.push( new Light( vec4( -300 * light_orbit[0], -200*light_orbit[1], -240 * light_orbit[0], 0 ), Color( 1, 0.7, .3, 1 ), Math.max(10000 * Math.sin(this.graphicsState.animation_time/10000 ), 100) ) );
+
     
           // *** Materials: *** Declare new ones as temps when needed; they're just cheap wrappers for some numbers.
           // 1st parameter:  Color (4 floats in RGBA format), 2nd: Ambient light, 3rd: Diffuse reflectivity, 4th: Specular reflectivity, 5th: Smoothness exponent, 6th: Texture image.
-          var purplePlastic = new Material( Color( .9,.5,.9,1 ), .01, .2, .4, 40 ), // Omit the final (string) parameter if you want no texture
-          greyPlastic = new Material( Color( .5,.5,.5,1 ), .01, .4, .2, 20 ),
-                earth = new Material( Color( 0, 0, 0, 1 ), 1,  .75, .9, 40, "custom_textures/earthmap.png" );
+          
                
-              
-
-"custom_textures/copper.png",
                
           /**********************************
           Start coding down here!!!!
@@ -237,24 +238,16 @@ Animation.prototype.display = function(time)
     //CURRENT_BASIS_IS_WORTH_SHOWING( this, model_transform);                 // Show another axis right where the rectangle is placed.
     CURRENT_BASIS_IS_WORTH_SHOWING( this, mat4() );                         // Show another axis placed at the world origin
 
-    this.drawSkyBox();
-    
-     shaders["Faked_Bump_Map"].activate();
-     this.m_globe.draw( this.graphicsState, model_transform, earth);
-    
+    this.drawSkyBox();  
 
-
-    // model_transform = this.drawGround(model_transform);
-     // set the surface of the ground plane as the new base axis
-
-      
+     //model_transform = mult(model_transform, translation(0, 20, 0)); 
      this.drawTemple(model_transform); 
      this.drawStellarObjects(model_transform);   
+     this.drawEarthSystem(model_transform);
 }    
 
 Animation.prototype.drawSkyBox = function(){
      var model_transform = mult(mat4(), scale(1000, 1000, 1000));  
-
 
      var front = new Material( Color( 0, 0, 0, 1 ), 1,  0, 0, 1, "custom_textures/skybox-front.jpg" );
      var left = new Material( Color( 0, 0, 0, 1 ), 1,  0, 0, 1, "custom_textures/skybox-left.jpg" );  
@@ -263,26 +256,44 @@ Animation.prototype.drawSkyBox = function(){
      var right = new Material( Color( 0, 0, 0, 1 ), 1,  0, 0, 1, "custom_textures/skybox-right.jpg" );  
      var back = new Material( Color( 0, 0, 0, 1 ), 1,  0, 0, 1, "custom_textures/skybox-back.jpg" );  
 
+     var galaxy = new Material( Color( 0.4, 0.4, 0.8, 0.5 ), .6,  0.2, 0.2, 1, "custom_textures/starfield.png" ); 
+
+     model_transform = mult(model_transform, rotation( -this.graphicsState.animation_time/5000, 0, 1,  0 ));
+
      this.m_square.draw(this.graphicsState, mult(model_transform, translation(-.5, -.5, -.5)), front);
      this.m_square.draw(this.graphicsState, mult(mult(model_transform, rotation( 90, 0, 1,  0 )),  translation(-.5, -.5, -.5)), left);
      this.m_square.draw(this.graphicsState, mult(mult(model_transform, rotation( -90, 0, 1,  0 )),  translation(-.5, -.5, -.5)), right);
      this.m_square.draw(this.graphicsState, mult(mult(model_transform, rotation( 180, 0, 1,  0 )),  translation(-.5, -.5, -.5)), back);
      this.m_square.draw(this.graphicsState, mult(mult(model_transform, rotation( 90, 1, 0,  0 )),  translation(-.5, -.5, -.5)), top);
      this.m_square.draw(this.graphicsState, mult(mult(model_transform, rotation( -90, 1, 0,  0 )),  translation(-.5, -.5, -.5)), bottom);
+
+     
+     var model_transform = mat4();  
+     
+     model_transform = mult(model_transform, scale(800, 1, 800));
+     model_transform = mult(model_transform, rotation( this.graphicsState.animation_time/2000, 0, 1,  0 ));
+     model_transform = mult(mult(model_transform, rotation( 90, 1, 0,  0 )), translation(-.5, -.5, -.5));
+     model_transform = mult(model_transform, translation(0, 0, -300));
+    
+     this.m_square.draw(this.graphicsState, model_transform, galaxy);
+
+     return mat4();
+
 }
 
 Animation.prototype.drawTemple = function(model_transform){
-      var marble = new Material( Color( 0, 0, 0, 1 ), 0.3,  .2, .3, 10, "custom_textures/marble.jpg" );
-      shaders["Default"].activate();
+      var marble = new Material( Color( 0, 0, 0, 1 ), 0.7,  .8, .7, 10, "custom_textures/steel2.jpg" );
+      var marblePillar = new Material( Color( 0.3, 0.3, 0.35, 1 ), 0.5,  .8, .7, 10, "custom_textures/steel.jpg" );
+    shaders["Faked_Bump_Map"].activate();
 
      var stack = [];
      stack.push(model_transform);
      this.m_temple.draw( this.graphicsState, mult(model_transform, scale(2, 3, 2)), marble);
 
      model_transform = mult(model_transform, translation(0, 0, 5));
-     for (var i=-12; i < 248; i+=20){
+     for (var i= -5; i < 255; i+=20){
          var rotated_transform = mult(model_transform, rotation(i, 0, 1, 0));
-          this.m_pillar.draw( this.graphicsState, mult(mult(rotated_transform, scale(1.3, 1.55, 1.3)), translation(18, 6.9, 0)), marble);
+          this.m_pillar.draw( this.graphicsState, mult(mult(rotated_transform, scale(1.3, 1.55, 1.3)), translation(18, 6.9, 0)), marblePillar);
      }
 
      model_transform = stack.pop();
@@ -293,7 +304,7 @@ Animation.prototype.drawStellarObjects = function(model_transform){
      var steel = new Material( Color( 0.1, 0.05, 0, 1 ), 0.7,  .8, .5, 10, "custom_textures/steel.jpg" );
     var steel2 = new Material( Color( 0.07, 0.025, 0.02, 1 ), 0.6,  1, 1, 40, "custom_textures/steel.jpg" );
     var silver = new Material( Color( 0, 0, 0, 1 ), 0.9,  1, 1, 40, "custom_textures/steel.jpg" );
-     var copper = new Material( Color( 0.1, 0, 0, 1 ), 0.9,  1, 1, 20, "custom_textures/copper.jpg" );
+     var copper = new Material( Color( 0.2, 0.05, 0.05, 1 ), 0.8,  1, 1, 20, "custom_textures/steel.jpg" );
        shaders["Faked_Bump_Map"].activate();
 
      var stack = [];
@@ -328,13 +339,49 @@ Animation.prototype.drawStellarObjects = function(model_transform){
 
      model_transform = stack.pop();
      return model_transform;
+}
 
+Animation.prototype.drawEarthSystem = function(model_transform){
+     shaders["Faked_Bump_Map"].activate();
+     var earth = new Material( Color( 0, 0, 0, 1 ), 1,  .75, .9, 40, "custom_textures/earthmap1k.jpg" );
+     var clouds = new Material( Color( 0, 0, 0, .2), .5, .2, 0, 5, "custom_textures/earthcloudmap.png");
+     var moon = new Material( Color( 0, 0, 0, 1), 1, .75, .9, 40, "custom_textures/moonmap.jpg");
+
+     var stack = [];
+     stack.push(model_transform);
+
+   
+     model_transform = mult(model_transform, translation(0, 10, 5)); 
+     stack.push(model_transform);
+    
+     model_transform = mult(model_transform,  rotation( this.graphicsState.animation_time/100, 0, 1,  0 ));
+       
+     CURRENT_BASIS_IS_WORTH_SHOWING( this, model_transform);      
+     model_transform = mult(model_transform, scale(7, 7, 7));
+     this.m_globe.draw( this.graphicsState, model_transform, earth);
+
+         
+     model_transform = mult(model_transform, scale(1.015, 1.015, 1.015));
+     model_transform = mult(model_transform, rotation( this.graphicsState.animation_time/1000, .2, 1,  0 ));
+     this.m_globe.draw( this.graphicsState, model_transform, clouds);
+
+     model_transform = stack.pop();
+
+     model_transform = mult(model_transform,  rotation( this.graphicsState.animation_time/100, .1, 1,  .1 ));
+     model_transform = mult(model_transform, translation(15, 0, 0)); 
+     model_transform = mult(model_transform,  rotation( this.graphicsState.animation_time/100, .5, 1,  .3 ));
+      model_transform = mult(model_transform, scale(1.92, 1.92, 1.92));
+     this.m_globe.draw( this.graphicsState, model_transform, moon);
+
+
+     model_transform = stack.pop();
+     return model_transform;
 }
 
 Animation.prototype.drawGround = function(model_transform){
      var greenGround = new Material(Color(.2, .5, .3, 1), .1, 1, 1, 40);
   
-     var stack = [];
+     var stack = [];s
      stack.push(model_transform);
      model_transform = mult(model_transform, scale(100, 1, 100));
      this.m_cube.draw( this.graphicsState, model_transform, greenGround); 
