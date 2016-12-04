@@ -94,15 +94,37 @@ function GL_Context( canvas_id, background_color )
 function Debug_Screen()	
 {	this.string_map = { };	this.m_text = new Text_Line( 20 ); 		this.start_index = 0;	this.tick = 0; 	this.visible = false;
 	this.graphicsState = new GraphicsState( mat4(), mat4(), 0 );
+	this.lastTime = 0;
+	this.lastFrame = 0;
+	this.averageFPS = 0;
 }
 
 	Debug_Screen.prototype.display = function(time)
 	{
-		if( !this.visible ) return;
+		
     
-    shaders["Default"].activate();
+    		shaders["Default"].activate();
 		gl.uniform4fv( g_addrs.shapeColor_loc, 			Color( .8,.8,.8,1 ) );
 		
+		
+		// update the last every 10 frames so we less jitters
+		if (this.tick%10 == 0){
+			this.averageFPS = (this.tick - this.lastFrame)/(time - this.lastTime)
+			this.lastFrame = this.tick;
+			this.lastTime = time;
+		}
+		// always draw the fps
+		var fps_model_transform = rotation( -90, vec3( 0, 1, 0 ) );                           
+		    fps_model_transform = mult( fps_model_transform, translation( .1, .9, .9 ) );
+		    fps_model_transform = mult( fps_model_transform, scale( 1, .075, .05) );
+
+		    //console.log(time/1000);
+		    this.m_text.set_string("FPS: "+(this.averageFPS*1000).toFixed(2));
+			this.m_text.draw( this.graphicsState, fps_model_transform, true, vec4(0,0,0,1) );		// Comment this out to not display any strings on the UI			
+			model_transform = mult( fps_model_transform, translation( 0, 1, 0 ) );
+
+		if( !this.visible ) return;
+
 		var model_transform = rotation( -90, vec3( 0, 1, 0 ) );                           
 		    model_transform = mult( model_transform, translation( .1, -.9, .9 ) );
 		    model_transform = mult( model_transform, scale( 1, .075, .05) );

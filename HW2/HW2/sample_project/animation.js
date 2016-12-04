@@ -29,12 +29,11 @@ var texture_filenames_to_load = [
      "custom_textures/earthmap1k.jpg",
      "custom_textures/moonmap.jpg",
      "custom_textures/earthcloudmap.png",
-     "custom_textures/copper.jpg",
      "custom_textures/steel.jpg",
      "custom_textures/steel2.jpg",
-     "custom_textures/marble.jpg",
      "custom_textures/leaves.jpg",
      "custom_textures/starfield.png",
+     "custom_textures/redcircle.jpg",
      "custom_textures/skybox-top.jpg",
      "custom_textures/skybox-front.jpg",
      "custom_textures/skybox-left.jpg",
@@ -77,6 +76,7 @@ function Animation()    // A class.  An example of a displayable object that our
      self.m_axis        = new Axis();
      self.m_windmill    = new Windmill(5);
      self.m_square      = new Square();
+     self.m_tetrahedron = new Tetrahedron(true);
 
     //imported custom objects
      self.m_sun          = new Shape_From_File( "custom_objects/sun.obj", scale( 1, 1, 1 ) );
@@ -84,15 +84,13 @@ function Animation()    // A class.  An example of a displayable object that our
      self.m_ring1        = new Shape_From_File( "custom_objects/ring1.obj", scale( 1, 1, 1 ) );
      self.m_ring2        = new Shape_From_File( "custom_objects/ring2.obj", scale( 1, 1, 1 ) );
      self.m_ring3        = new Shape_From_File( "custom_objects/ring3.obj", scale( 1, 1, 1 ) );
-     self.m_altar        = new Shape_From_File( "custom_objects/altar.obj", scale( 1, 1, 1 ) );
      self.m_temple       = new Shape_From_File( "custom_objects/round_temple.obj", scale( 1, 1, 1 ) );
-     self.m_temple_roof  = new Shape_From_File( "custom_objects/round_temple_roof.obj", scale( 1, 1, 1 ) );
      self.m_pillar       = new Shape_From_File( "custom_objects/pillar.obj", scale( 1, 1, 1 ) );
-     self.m_tree1          = new Shape_From_File( "custom_objects/trunk1.obj", scale( 1, 1, 1 ) );
-     self.m_tree2          = new Shape_From_File( "custom_objects/trunk2.obj", scale( 1, 1, 1 ) );
-     self.m_tree3          = new Shape_From_File( "custom_objects/trunk3.obj", scale( 1, 1, 1 ) );
      self.m_leaves         = new Shape_From_File( "custom_objects/leaves.obj", scale( 1, 1, 1 ) );
      self.m_globe        = new Shape_From_File( "custom_objects/globe.obj", scale( 1, 1, 1 ) );
+     self.m_squarecup = new Squarecup();
+
+     self.currentLookAtIndex = 0;
 
 
 
@@ -124,7 +122,7 @@ Animation.prototype.init_keys = function()
      shortcut.add( "f",     function() { looking = !looking; } );
      shortcut.add( ",",   ( function(self) { return function() { self.graphicsState.camera_transform = mult( rotation( 3, 0, 0,  1 ), self.graphicsState.camera_transform       ); } } ) (this) ) ;
      shortcut.add( ".",   ( function(self) { return function() { self.graphicsState.camera_transform = mult( rotation( 3, 0, 0, -1 ), self.graphicsState.camera_transform       ); } } ) (this) ) ;
-  shortcut.add( "o",   ( function(self) { return function() { origin = vec3( mult_vec( inverse( self.graphicsState.camera_transform ), vec4(0,0,0,1) )                       ); } } ) (this) ) ;
+     shortcut.add( "o",   ( function(self) { return function() { origin = vec3( mult_vec( inverse( self.graphicsState.camera_transform ), vec4(0,0,0,1) )                       ); } } ) (this) ) ;
      shortcut.add( "r",   ( function(self) { return function() { self.graphicsState.camera_transform = mat4(); }; } ) (this) );
      shortcut.add( "ALT+g", function() { gouraud = !gouraud; } );
      shortcut.add( "ALT+n", function() { color_normals = !color_normals;   } );
@@ -236,17 +234,53 @@ Animation.prototype.display = function(time)
     
     //this.m_strip.draw( this.graphicsState, model_transform, greyPlastic );    // Rectangle example.  (Issue a command to draw one.)  Notice the effect of the 3 previous lines.
     //CURRENT_BASIS_IS_WORTH_SHOWING( this, model_transform);                 // Show another axis right where the rectangle is placed.
-    CURRENT_BASIS_IS_WORTH_SHOWING( this, mat4() );                         // Show another axis placed at the world origin
+    //CURRENT_BASIS_IS_WORTH_SHOWING( this, mat4() );                         // Show another axis placed at the world origin
 
-    this.drawSkyBox();  
+     this.drawSkyBox();   
+
+     this.runGuidedPath();
 
      //model_transform = mult(model_transform, translation(0, 20, 0)); 
      this.drawTemple(model_transform); 
      this.drawStellarObjects(model_transform);   
      this.drawEarthSystem(model_transform);
+     this.drawCustomShapeReqs(model_transform);
 }    
 
+Animation.prototype.runGuidedPath = function(){
+     var startingLocation = vec3(0, -40, 0);
+     
+    
+     var lookAtArray = [vec3(0, 0, 0), vec3(30, 0, 0), vec3(20, 50, 40), vec3(0, 10, 0)];
+
+     var numLookAts = lookAtArray.length;
+
+     var totalRunTime = 12.3; // full path will take 10 seconds to run
+
+     var elapsedSeconds = this.graphicsState.animation_time/1000;
+     var remainingRunTime = totalRunTime-elapsedSeconds;
+     if (remainingRunTime < 0)
+          return;
+
+    
+
+
+
+     // calculate the spiral path the location takes 
+     var location = startingLocation;
+         location[0] += Math.sin(elapsedSeconds/2)*150*(Math.max(0.2, (remainingRunTime/totalRunTime)));
+          location[2] += Math.cos(elapsedSeconds/2)*150*(Math.max(0.4, ((remainingRunTime)/totalRunTime)));
+          location[1] += (this.graphicsState.animation_time/1000)*5;
+          location[1] += -1.5*elapsedSeconds;
+
+
+     this.graphicsState.camera_transform = lookAt(location, vec3(0, 40-(elapsedSeconds*2), 0) , vec3(0, 1, 0));
+
+
+}
+
 Animation.prototype.drawSkyBox = function(){
+     shaders[ "Default" ].activate();  
      var model_transform = mult(mat4(), scale(1000, 1000, 1000));  
 
      var front = new Material( Color( 0, 0, 0, 1 ), 1,  0, 0, 1, "custom_textures/skybox-front.jpg" );
@@ -257,6 +291,7 @@ Animation.prototype.drawSkyBox = function(){
      var back = new Material( Color( 0, 0, 0, 1 ), 1,  0, 0, 1, "custom_textures/skybox-back.jpg" );  
 
      var galaxy = new Material( Color( 0.4, 0.4, 0.8, 0.5 ), .6,  0.2, 0.2, 1, "custom_textures/starfield.png" ); 
+     
 
      model_transform = mult(model_transform, rotation( -this.graphicsState.animation_time/5000, 0, 1,  0 ));
 
@@ -270,13 +305,16 @@ Animation.prototype.drawSkyBox = function(){
      
      var model_transform = mat4();  
      
-     model_transform = mult(model_transform, scale(800, 1, 800));
+     // map the stars to the squarecup, flip it up side down t beecomes a big hood
+     model_transform = mult(model_transform, scale(80, 80, 80));
      model_transform = mult(model_transform, rotation( this.graphicsState.animation_time/2000, 0, 1,  0 ));
-     model_transform = mult(mult(model_transform, rotation( 90, 1, 0,  0 )), translation(-.5, -.5, -.5));
-     model_transform = mult(model_transform, translation(0, 0, -300));
+     model_transform = mult(model_transform, rotation( 180, 1, 0,  0 ));
+    model_transform = mult(model_transform, translation(0, -2.05, 0));
     
-     this.m_square.draw(this.graphicsState, model_transform, galaxy);
+     this.m_squarecup.draw(this.graphicsState, model_transform, galaxy);
 
+      var model_transform = mat4();  
+   
      return mat4();
 
 }
@@ -303,8 +341,8 @@ Animation.prototype.drawTemple = function(model_transform){
 Animation.prototype.drawStellarObjects = function(model_transform){
      var steel = new Material( Color( 0.1, 0.05, 0, 1 ), 0.7,  .8, .5, 10, "custom_textures/steel.jpg" );
     var steel2 = new Material( Color( 0.07, 0.025, 0.02, 1 ), 0.6,  1, 1, 40, "custom_textures/steel.jpg" );
-    var silver = new Material( Color( 0, 0, 0, 1 ), 0.9,  1, 1, 40, "custom_textures/steel.jpg" );
-     var copper = new Material( Color( 0.2, 0.05, 0.05, 1 ), 0.8,  1, 1, 20, "custom_textures/steel.jpg" );
+    var silver = new Material( Color( .1, .1, .1, 1 ), 1,  1, 1, 40, "custom_textures/steel.jpg" );
+     var copper = new Material( Color( 0.3, 0.2, 0.05, 1 ), .7,  1, 1, 20, "custom_textures/steel.jpg" );
        shaders["Faked_Bump_Map"].activate();
 
      var stack = [];
@@ -312,9 +350,9 @@ Animation.prototype.drawStellarObjects = function(model_transform){
 
      model_transform = mult(model_transform, scale(30, 30, 30));
 
-     this.m_ring1.draw( this.graphicsState, mult(model_transform,  rotation( this.graphicsState.animation_time/20, 0.5, 1,  0 )), steel2);
-     this.m_ring2.draw( this.graphicsState, mult(model_transform, rotation( this.graphicsState.animation_time/15, 0.2, 1,  0.3 )), steel);
-     this.m_ring3.draw( this.graphicsState, mult(model_transform,  rotation( this.graphicsState.animation_time/10, 0.8, 1,  1 )), steel);
+     this.m_ring1.draw( this.graphicsState, mult(model_transform,  rotation( this.graphicsState.animation_time/20+120, 0.5, 1,  0 )), steel2);
+     this.m_ring2.draw( this.graphicsState, mult(model_transform, rotation( this.graphicsState.animation_time/15-170, 0.2, 1,  0.3 )), steel);
+     this.m_ring3.draw( this.graphicsState, mult(model_transform,  rotation( this.graphicsState.animation_time/10 + 90, 0.8, 1,  1 )), steel);
 
      model_transform = stack.pop();
      stack.push(model_transform);
@@ -341,11 +379,39 @@ Animation.prototype.drawStellarObjects = function(model_transform){
      return model_transform;
 }
 
+// draws two of my custom shapes on top of the 2 large pillars so you can easily check them for the requirement fulfilment
+Animation.prototype.drawCustomShapeReqs = function(model_transform){
+     var stack = [];
+     stack.push(model_transform);
+
+     shaders[ "Default" ].activate();  
+
+     var red = new Material(Color(.8, .1, .1, 1), .1, 1, 1, 40);
+     var redcircle = new Material( Color( 0.4, 0.4, 0.8, 0.5 ), .6,  0.2, 0.2, 1, "custom_textures/redcircle.jpg" ); 
+
+
+     // draw basic custom shape for checking under Phong Reflection and flat shading
+     model_transform = mult(model_transform, translation(16.3, 33.5, 25.5));
+     this.m_squarecup.draw( this.graphicsState, model_transform, red); 
+
+     model_transform = stack.pop();
+     stack.push(model_transform);
+
+     // draw textured mapped custom shape so you can check out how I map the texture to the cup
+     model_transform = mult(model_transform, translation(-16.3, 33.5, 25.5));
+     this.m_squarecup.draw( this.graphicsState, model_transform, redcircle); 
+
+
+
+     model_transform = stack.pop();
+     return model_transform;
+}
+
 Animation.prototype.drawEarthSystem = function(model_transform){
      shaders["Faked_Bump_Map"].activate();
      var earth = new Material( Color( 0, 0, 0, 1 ), 1,  .75, .9, 40, "custom_textures/earthmap1k.jpg" );
      var clouds = new Material( Color( 0, 0, 0, .2), .5, .2, 0, 5, "custom_textures/earthcloudmap.png");
-     var moon = new Material( Color( 0, 0, 0, 1), 1, .75, .9, 40, "custom_textures/moonmap.jpg");
+     var moon = new Material( Color( .05, .05, .05, 1), 1, 1, .9, 40, "custom_textures/moonmap.jpg");
 
      var stack = [];
      stack.push(model_transform);

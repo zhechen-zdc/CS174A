@@ -146,4 +146,48 @@ function Shape_From_File( filename, points_transform )
 			}                                                 // Begin downloading the mesh, and once it completes return control to our webGLStart function
 		OBJ.downloadMeshes( { 'mesh' : filename }, (function(self) { return self.webGLStart.bind(self) }(this) ) );
 	}
-inherit( Shape_From_File, Shape );
+inherit( Shape_From_File, Shape ); 
+
+// CUSTOM SHAPES
+Make_Shape_Subclass( "Squarecup", Shape );
+  Squarecup.prototype.populate = function()   // Takes a boolean argument 
+  {  
+  	// base square is 2x2 units
+  	//height is 1 unit
+
+  	//NOTE: THe normals are calculated to face inwards, because this is meant to be used as the rotating star hood, so the inside of the cup has the right normals.
+  	//NOTE: The texture coordinates are mapped so that the the center of the square gets the middle 50% of the image while each side gets one of the sides as if its folded
+  	//create the flat square using 2 triangles and continous, centered around the center of the hat
+  	this.positions.push( vec3(-1,0,-1), vec3(1,0,-1), vec3(-1,0,1), vec3(1,0,1) ); // Specify the 4 vertices of the 2 triangles forming the square
+  	this.normals.push( vec3(0,1,0), vec3(0,1,0), vec3(0,1,0), vec3(0,1,0) ); // ...
+  	this.texture_coords.push( vec2(.25,.25),   vec2(.75,.25),   vec2(.25,.75),   vec2(.75,.75)   ); // ..
+  	this.indices.push( 0, 1, 2,     1, 3, 2 );  
+
+  	//bottom slant flap
+  	this.positions.push( vec3(-2,1,-2), vec3(2,1,-2), vec3(-1,0,-1), vec3(1,0,-1) ); 
+  	var newNormal = mult_vec(rotation( 45, 1, 0, 0 ), vec3( 0, 1, 0 ) );  // normal rotates in towards the center of the plane, in this case x axis
+     this.normals.push( vec3(newNormal), vec3(newNormal), vec3(newNormal), vec3(newNormal) ); // ...
+	this.texture_coords.push( vec2(0, 0),   vec2(1, 0),   vec2(.25,.25),   vec2(.75,.25)   ); // ...
+	this.indices.push( 4, 5, 6,     5, 7, 6 );  
+
+	//left slant flap
+  	this.positions.push( vec3(-2,1,2), vec3(-2,1,-2), vec3(-1,0,1), vec3(-1,0,-1) ); 
+  	var newNormal = mult_vec(rotation( -45, 0, 0, 1 ), vec3( 0, 1, 0 ) );  // normal rotates in towards the center of the plane, in this case z axis
+     this.normals.push( vec3(newNormal), vec3(newNormal), vec3(newNormal), vec3(newNormal) ); // ...
+	this.texture_coords.push( vec2(0,1),   vec2(0,0),   vec2(.25,.75),   vec2(.25,.25)   ); // ...
+	this.indices.push( 8, 9, 10,     9, 11, 10 );  
+
+	//right slant flap
+  	this.positions.push( vec3(2,1,-2), vec3(2,1,2), vec3(1,0,-1), vec3(1,0,1) ); 
+  	var newNormal = mult_vec(rotation( 45, 0, 0, 1 ), vec3( 0, 1, 0 ) );  // normal rotates in towards the center of the plane
+     this.normals.push( vec3(newNormal), vec3(newNormal), vec3(newNormal), vec3(newNormal) ); // ...
+	this.texture_coords.push( vec2(1,0),   vec2(1,1),   vec2(.75,.25),   vec2(.75,.75)   ); // ...
+	this.indices.push( 12, 13, 14,     13, 15, 14 );  
+
+	//top slant flap
+  	this.positions.push( vec3(2,1,2), vec3(-2,1,2), vec3(1,0,1), vec3(-1,0,1) ); 
+  	var newNormal = mult_vec(rotation( -45, 1, 0, 0 ), vec3( 0, 1, 0 ) );  // normal rotates in towards the center of the plane
+     this.normals.push( vec3(newNormal), vec3(newNormal), vec3(newNormal), vec3(newNormal) ); // ...
+	this.texture_coords.push( vec2(1,1),   vec2(0,1),   vec2(.75,.75),   vec2(.25, .75)   ); // ...
+	this.indices.push( 16, 17, 18,     17, 19, 18 );  
+  };    
