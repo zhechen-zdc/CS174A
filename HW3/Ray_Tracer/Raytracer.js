@@ -9,10 +9,13 @@ function Ball( )
 
 Ball.prototype.construct = function()
 {
-
+  //use the arguments from position and size to set the model transform of the spheres
   this.model_transform = mat4();
   this.model_transform = mult(this.model_transform, translation(this.position[0], this.position[1], this.position[2])); 
   this.model_transform = mult(this.model_transform, scale(this.size[0], this.size[1], this.size[2]));
+ 
+  // precalculate the inverse transform for easier ray intersection calculations
+  this.inverse_transform = inverse(this.model_transform);
 }
 
 Ball.prototype.intersect = function( ray, existing_intersection, minimum_dist )
@@ -21,7 +24,51 @@ Ball.prototype.intersect = function( ray, existing_intersection, minimum_dist )
   //        so far, updates it if needed and returns it.  Only counts intersections that are at least a given distance ahead along the ray.
   //        An interection object is assumed to store a Ball pointer, a t distance value along the ray, and a normal.
 
+  //console.log(ray);
+  //calculate the inverse transform of the ray using the inverse_transform from the ball
+  var inverse_ray = {};
+  inverse_ray.origin = mult_vec(this.inverse_transform, ray.origin);
+  inverse_ray.dir = mult_vec(this.inverse_transform, ray.dir);
+
+  inverse_ray.origin.pop();
+  inverse_ray.dir.pop();
+
+
+  var S_dot_c = dot(inverse_ray.origin, inverse_ray.dir);
+  var abs_S_squared = dot(inverse_ray.origin, inverse_ray.origin);
+  var abs_c_squared = dot(inverse_ray.dir, inverse_ray.dir);
+ 
+  var discriminant = S_dot_c * S_dot_c - abs_c_squared * (abs_S_squared - 1);
+  if (discriminant < 0)
+    return existing_intersection;
+
+  var t_h_array = [];
+  var negative_B_over_A = -1 * (S_dot_c/abs_c_squared); 
+
+  if (discriminant == 0)
+    t_h_array.push(negative_B_over_A);
+  else {
+    t_h_array.push(negative_B_over_A + discriminant/abs_c_squared);
+    t_h_array.push(negative_B_over_A - discriminant/abs_c_squared);
+  }
+
+  // iterate through possible 1 or 2 t_hs 
+  for (i = 0, iLen = t_h_array.length; i < iLen; i++){
+    var t_h = t_h_array[i];
+    if (t_h > minimum_dist && t_h < existing_intersection.t){
+      existing_intersection.ball = this;
+      existing_intersection.t = t_h;
+    }
+  }
   return existing_intersection;
+}
+
+// function to print easily readable 4x4 matrices
+var printTransform = function(m){
+  console.log("Transformation Matrix:");
+  for (i = 0; i < 4; i++){
+    console.log(m[i][0]+"\t",m[i][1]+"\t",m[i][2]+"\t",m[i][3]+"\t");
+  }
 }
 
 var mult_3_coeffs = function( a, b ) { return [ a[0]*b[0], a[1]*b[1], a[2]*b[2] ]; };       // Convenient way to combine two color vectors
@@ -71,7 +118,7 @@ function Raytracer( parent )
   
   this.make_menu();
 
-  load_case( 'empty' ); this.parseFile();
+  load_case( 'testOutline' ); this.parseFile();
 }
 
 Raytracer.prototype.toggle_visible = function() { this.visible = !this.visible; document.getElementById("progress").style = "display:inline-block;" };
@@ -135,12 +182,26 @@ Raytracer.prototype.trace = function( ray, color_remaining, shadow_test_light_so
   //        If a light source for shadow testing is provided as the optional final argument, this function's objective simplifies to just 
   //        checking the path directly to a light source for obstructions.
   
+  //console.log(color_remaining);
+
+
   if( length( color_remaining ) < .3 )    return Color( 0, 0, 0, 1 );  // Is there any remaining potential for brightening this pixel even more?
 
-  var closest_intersection = { distance: Number.POSITIVE_INFINITY }    // An empty intersection object
+  var closest_intersection = { 
+    ball: null,
+    t: Number.POSITIVE_INFINITY,
+    normal: null
+  }    // An empty intersection object
+
+
+  for( i in this.balls ){
+    this.balls[i].intersect(ray, closest_intersection, 1);
+  }
   
   if( !closest_intersection.ball )
     return mult_3_coeffs( this.ambient, background_functions[ curr_background_function ] ( ray ) ).concat(1);     
+  else 
+    return Color( 0, 0, 0, 1 );
 }
 
 Raytracer.prototype.parseLine = function( tokens )            // Load the text lines into variables
