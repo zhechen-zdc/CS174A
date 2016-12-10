@@ -596,6 +596,15 @@ function mix( u, v, s )
     return result;
 }
 
+// clamps a vector to max 1
+function clamp(u){
+    var result = [];
+    for (var i =0; i < u.length; i++){
+        result[i] = Math.min(1, u[i]);
+    }
+    return result;
+}
+
 //----------------------------------------------------------------------------
 //
 // Vector and Matrix functions

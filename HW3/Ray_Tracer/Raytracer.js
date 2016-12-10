@@ -16,50 +16,92 @@ Ball.prototype.construct = function()
  
   // precalculate the inverse transform for easier ray intersection calculations
   this.inverse_transform = inverse(this.model_transform);
+
+  this.inverse_ray = {};
+  this.vec_S;
+  this.vec_c;
+  this.S_dot_c;
+  this.abs_S_squared;
+  this.abs_c_squared;
+  this.discriminant;
+  this.t_final;
+  this.t1;
+  this.t2;
+  this.tmin;
+  this.tmax;
+  this.negative_B_over_A;
+  this.inside = false;
 }
 
 Ball.prototype.intersect = function( ray, existing_intersection, minimum_dist )
 {
-  // TODO:  Given a ray, check if this Ball is in its path.  Recieves as an argument a record of the nearest intersection found 
-  //        so far, updates it if needed and returns it.  Only counts intersections that are at least a given distance ahead along the ray.
-  //        An interection object is assumed to store a Ball pointer, a t distance value along the ray, and a normal.
-
-  //console.log(ray);
   //calculate the inverse transform of the ray using the inverse_transform from the ball
-  var inverse_ray = {};
-  inverse_ray.origin = mult_vec(this.inverse_transform, ray.origin);
-  inverse_ray.dir = mult_vec(this.inverse_transform, ray.dir);
-
-  inverse_ray.origin.pop();
-  inverse_ray.dir.pop();
-
-
-  var S_dot_c = dot(inverse_ray.origin, inverse_ray.dir);
-  var abs_S_squared = dot(inverse_ray.origin, inverse_ray.origin);
-  var abs_c_squared = dot(inverse_ray.dir, inverse_ray.dir);
+  this.inverse_ray = {
+    origin : mult_vec(this.inverse_transform, ray.origin),
+    dir:  mult_vec(this.inverse_transform, ray.dir)
+  }
  
-  var discriminant = S_dot_c * S_dot_c - abs_c_squared * (abs_S_squared - 1);
-  if (discriminant < 0)
+  this.vec_S = this.inverse_ray.origin.slice(0, 3);
+  this.vec_c = this.inverse_ray.dir.slice(0, 3);
+  
+  // calculate the discriminant and commonly used dot products
+  this.S_dot_c = dot(this.vec_S, this.vec_c);
+  this.abs_S_squared = dot(this.vec_S, this.vec_S);
+  this.abs_c_squared = dot(this.vec_c, this.vec_c);
+ 
+  this.discriminant = this.S_dot_c * this.S_dot_c - this.abs_c_squared * (this.abs_S_squared - 1);
+
+  // no solution, return old intersection
+  if (this.discriminant < 0)
     return existing_intersection;
 
-  var t_h_array = [];
-  var negative_B_over_A = -1 * (S_dot_c/abs_c_squared); 
+  this.negative_B_over_A = -1 * (this.S_dot_c/this.abs_c_squared); 
+  this.inside = false;
 
-  if (discriminant == 0)
-    t_h_array.push(negative_B_over_A);
+  // set either 1 or 2 solutions
+  if (this.discriminant == 0)
+    this.t1 = this.negative_B_over_A;
   else {
-    t_h_array.push(negative_B_over_A + discriminant/abs_c_squared);
-    t_h_array.push(negative_B_over_A - discriminant/abs_c_squared);
+    this.t1 = this.negative_B_over_A + Math.sqrt(this.discriminant)/this.abs_c_squared;
+    this.t2 = this.negative_B_over_A - Math.sqrt(this.discriminant)/this.abs_c_squared;
   }
 
-  // iterate through possible 1 or 2 t_hs 
-  for (i = 0, iLen = t_h_array.length; i < iLen; i++){
-    var t_h = t_h_array[i];
-    if (t_h > minimum_dist && t_h < existing_intersection.t){
-      existing_intersection.ball = this;
-      existing_intersection.t = t_h;
-    }
+  this.tmin = Math.min(this.t1, this.t2);
+  this.tmax = Math.max(this.t1, this.t2);
+
+  if (this.tmin < minimum_dist && this.tmax < minimum_dist){
+    // case where both intersections are behind the viewing plane, return existing intersection
+    return existing_intersection;
   }
+
+  if (this.tmin > minimum_dist)
+    // case where intersect the outer sphere from our side
+    this.t_final = this.tmin;
+  else if (this.tmin < minimum_dist && this.tmax > minimum_dist){
+    // case where we are inside the sphere, flip the normal 
+    this.inside = true;
+    this.t_final = this.tmax;
+  }
+
+  // if the new intersection insn't actually closer, return existing intersection
+  if (this.t_final > existing_intersection.t){
+    return existing_intersection;
+  }
+
+  
+   existing_intersection.ball = this;
+   existing_intersection.t = this.t_final;
+   var P = add(this.inverse_ray.origin, scale_vec(this.t_final, this.inverse_ray.dir));
+   P[3] = 0;  // Since the origin of the sphere is 0,0,0, we can treat this as a vector from the origin position by setting the 4th element as 0
+
+    //inverse transpose multiplied by P to get the normal of the original ray hitting the transformed sphere, slice off the 4th argument before normalizing the vector
+   existing_intersection.normal = normalize(mult_vec(transpose(this.inverse_transform), P).slice(0, 3)).concat(0);
+
+   // if we're inside a sphere, the normal needs to be flipped
+  if (this.inside)
+   existing_intersection.normal = scale_vec(-1, existing_intersection.normal);
+    
+  
   return existing_intersection;
 }
 
@@ -118,7 +160,9 @@ function Raytracer( parent )
   
   this.make_menu();
 
-  load_case( 'testOutline' ); this.parseFile();
+  this.white = vec3(1, 1, 1);
+
+  load_case( 'testRefract' ); this.parseFile();
 }
 
 Raytracer.prototype.toggle_visible = function() { this.visible = !this.visible; document.getElementById("progress").style = "display:inline-block;" };
@@ -170,22 +214,10 @@ Raytracer.prototype.getDir = function( ix, iy ) {
   return vec4( x, y, -this.near, 0 );    // replace
 }
   
-Raytracer.prototype.trace = function( ray, color_remaining, shadow_test_light_source )
+Raytracer.prototype.trace = function( ray, color_remaining, is_shadow_test, is_rf, rfCount)
 {
-  // TODO:  Given a ray, return the color in that ray's path.  Could be originating from the camera itself or from a secondary reflection 
-  //        or refraction off a ball.  Call Ball.prototype.intersect on each ball to determine the nearest ball struck, if any, and perform
-  //        vector math (namely the Phong reflection formula) using the resulting intersection record to figure out the influence of light on 
-  //        that spot.  
-  //
-  //        Arguments include some indicator of recursion level so you can cut it off after a few recursions.  Or, optionally,
-  //        instead just store color_remaining, the pixel's remaining potential to be lit up more... proceeding only if that's still significant.  
-  //        If a light source for shadow testing is provided as the optional final argument, this function's objective simplifies to just 
-  //        checking the path directly to a light source for obstructions.
-  
-  //console.log(color_remaining);
 
-
-  if( length( color_remaining ) < .3 )    return Color( 0, 0, 0, 1 );  // Is there any remaining potential for brightening this pixel even more?
+  if( length(color_remaining) < .3)    return Color( 0, 0, 0, 1 );  // Is there any remaining potential for brightening this pixel even more?
 
   var closest_intersection = { 
     ball: null,
@@ -193,15 +225,103 @@ Raytracer.prototype.trace = function( ray, color_remaining, shadow_test_light_so
     normal: null
   }    // An empty intersection object
 
+  var ball;
+  var vec_c = ray.dir;
+  var vec_N, vec_L, vec_V, vec_R;
+  var vec_N_dot_L, vec_R_dot_V;
+  var point_P, light, diffuse_component, specular_component, surface_color, reflectColor, refractColor, pixel_color;
+  var reflectRay, reflectTrace, refractRay, resfractTrace, shadowRay, shadowHit;
 
-  for( i in this.balls ){
-    this.balls[i].intersect(ray, closest_intersection, 1);
+  // find the closest object intersecting with the input ray
+  for(var i =0, iLen = this.balls.length; i < iLen; i++){
+    this.balls[i].intersect(ray, closest_intersection, is_shadow_test || is_rf ? 0.0001 : 1);
+    // when we are doing shadow ray test, as soon as there's 1 hit for shadow we can stop calculating for other objects
+    if (is_shadow_test && closest_intersection.balls)
+      break;
+  }
+
+  // if we're doing a shadow test just return the closest distance hit, or null if no object hit
+  if (is_shadow_test){
+    return closest_intersection.ball ? closest_intersection.t : null;
   }
   
   if( !closest_intersection.ball )
     return mult_3_coeffs( this.ambient, background_functions[ curr_background_function ] ( ray ) ).concat(1);     
+
+  ball = closest_intersection.ball;
+  vec_N = closest_intersection.normal;
+  point_P = add(ray.origin, scale_vec(closest_intersection.t, ray.dir));
+
+
+  // ambient color
+  surface_color = clamp(scale_vec(ball.k_a, ball.color));
+ 
+  for (var i = 0, iLen = this.anim.graphicsState.lights.length; i < iLen; i++){
+    light = this.anim.graphicsState.lights[i];
+
+    shadowRay = {
+      origin: point_P, 
+      dir: subtract(light.position, point_P)
+    };
+  
+    shadowHit = this.trace(shadowRay, vec3(1, 1, 1), true);
+
+    // if our shadowRay hit something and the distance it hit is between 0.0001 and 1, we can skip the rest of the surface_color from this light source
+    if (shadowHit && shadowHit > 0.0001 && shadowHit < 1){
+      continue;
+    }
+
+    // calculate N, L, V, R for diffuse and specular lighting   
+    vec_L = normalize(subtract(light.position, point_P));
+    vec_N_dot_L = dot(vec_N, vec_L);
+    vec_V = normalize(subtract(ray.origin, point_P));
+    vec_N_dot_L = dot(vec_N, vec_L);
+    vec_R = subtract(scale_vec(2 * vec_N_dot_L, vec_N), vec_L);
+    vec_R_dot_V = dot(vec_R, vec_V);
+  
+    diffuse_componet = clamp(scale_vec(ball.k_d * Math.max(0, vec_N_dot_L), ball.color));
+    specular_component = clamp(scale_vec(ball.k_s * Math.pow(Math.max(0, vec_R_dot_V), ball.n), this.white));
+  
+    surface_color = add(surface_color, mult_3_coeffs(light.color.slice(0.3), add(diffuse_componet, specular_component)));
+  }
+
+  // calculate the available reamining color
+  var newColorRemaining = mult_3_coeffs(color_remaining, subtract(this.white, surface_color));
+
+  if (ball.k_r > 0){
+     // create a new reflectin ray
+    reflectRay = {
+      origin: point_P,
+      dir: add(scale_vec(-2 * dot(vec_N, vec_c), vec_N), vec_c)
+    };
+    reflectTrace = this.trace(reflectRay, scale_vec(ball.k_r, newColorRemaining) , false, true);
+    reflectColor = clamp(scale_vec(ball.k_r, reflectTrace.slice(0, 3)));
+  }
+  else
+    reflectColor = vec3(0, 0, 0);
+
+  if (ball.k_refract > 0){
+    var small_l = normalize(ray.dir);
+    var small_c = -1 * dot(vec_N, small_l);
+
+    var discriminant = 1.0 - ball.refract_index*ball.refract_index*(1.0 - small_c*small_c);
+
+    refractRay = {
+      origin: point_P,
+      dir: add(scale_vec(ball.refract_index, small_l), scale_vec(ball.refract_index*small_c - Math.sqrt(discriminant), vec_N))
+    }
+ 
+
+    refractTrace = this.trace(refractRay, scale_vec(ball.k_refract, newColorRemaining), false, true, rfCount - 1);
+    refractColor = clamp(scale_vec(ball.k_refract, refractTrace.slice(0, 3)));
+  }
   else 
-    return Color( 0, 0, 0, 1 );
+    refractColor = vec3(0, 0, 0)
+  
+  //pixel_color = surface_color;
+  pixel_color = add(surface_color, mult_3_coeffs(subtract(this.white, surface_color), add(reflectColor, refractColor)));
+
+  return clamp(pixel_color);
 }
 
 Raytracer.prototype.parseLine = function( tokens )            // Load the text lines into variables
@@ -270,16 +390,18 @@ Raytracer.prototype.display = function(time)
   this.scratchpad_context.drawImage(textures["procedural"].image, 0, 0 );
   this.imageData = this.scratchpad_context.getImageData(0, 0, this.width, this.height );    // Send the newest pixels over to the texture
   var camera_inv = inverse( this.anim.graphicsState.camera_transform );
-  // console.log(this.scanlines_per_frame);     
-    for( var i = 0; i < this.scanlines_per_frame; i++ )     // Update as many scanlines on the picture at once as we can, based on previous frame's speed
+    
+  for( var i = 0; i < this.scanlines_per_frame; i++ )     // Update as many scanlines on the picture at once as we can, based on previous frame's speed
   {
     var y = this.scanline++;
-    if( y >= this.height ) { this.scanline = 0; document.getElementById("progress").style = "display:none" };
+    if( y >= this.height ) { 
+  //    die(); 
+      this.scanline = 0; document.getElementById("progress").style = "display:none" };
     document.getElementById("progress").innerHTML = "Rendering ( " + 100 * y / this.height + "% )..."; 
     for ( var x = 0; x < this.width; x++ )
     {
       var ray = { origin: mult_vec( camera_inv, vec4( 0, 0, 0, 1 ) ), dir: mult_vec( camera_inv, this.getDir( x, y ) ) };   // Apply camera
-      this.setColor( x, y, this.trace( ray, vec3( 1, 1, 1 ) ) );                                    // ******** Trace a single ray *********
+      this.setColor( x, y, this.trace( ray, vec3(1, 1, 1) , false, false, 4) );                                    // ******** Trace a single ray *********
     }
   }
 
@@ -299,10 +421,6 @@ Raytracer.prototype.display = function(time)
   this.m_text .draw( new GraphicsState( mat4(), mat4(), 0 ), model_transform, true, vec4(0,0,0, 1 - time/10000 ) );         
       model_transform = mult( model_transform, translation( 0, -1, 0 ) );
   this.m_text2.draw( new GraphicsState( mat4(), mat4(), 0 ), model_transform, true, vec4(0,0,0, 1 - time/10000 ) );   
-
- //this.count++;
- if (this.count > 2)
-  die();
 }
 
 Raytracer.prototype.init_keys = function()   {  shortcut.add( "SHIFT+r", this.toggle_visible.bind( this ) );  }
