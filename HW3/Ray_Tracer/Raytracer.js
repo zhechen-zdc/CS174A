@@ -9,8 +9,10 @@ function Ball( )
 
 Ball.prototype.construct = function()
 {
-  // TODO:  Give Ball any other data members that might be useful, assigning them according to this Ball's this.position and this.size members.
-  this.model_transform = mat4();      // replace
+
+  this.model_transform = mat4();
+  this.model_transform = mult(this.model_transform, translation(this.position[0], this.position[1], this.position[2])); 
+  this.model_transform = mult(this.model_transform, scale(this.size[0], this.size[1], this.size[2]));
 }
 
 Ball.prototype.intersect = function( ray, existing_intersection, minimum_dist )
@@ -47,11 +49,13 @@ var background_color = vec4( 0, 0, 0, 1 );
 // Raytracer class - gets registered to the window by the Animation object that owns it
 function Raytracer( parent )  
 {
-  var defaults = { width: 32, height: 32, near: 1, left: -1, right: 1, bottom: -1, top: 1, scanline: 0, visible: true, anim: parent, ambient: vec3( .1, .1, .1 ) };
+  //var defaults = { width: 32, height: 32, near: 1, left: -1, right: 1, bottom: -1, top: 1, scanline: 0, visible: true, anim: parent, ambient: vec3( .1, .1, .1 ) };
+  var defaults = { width: 4, height: 4, near: 1, left: -1, right: 1, bottom: -1, top: 1, scanline: 0, visible: true, anim: parent, ambient: vec3( .1, .1, .1 ) };
   for( i in defaults )  this[ i ] = defaults[ i ];
   
   this.m_square = new N_Polygon( 4 );                   // For texturing with and showing the ray traced result
   this.m_sphere = new Subdivision_Sphere( 4, true );    // For drawing with ray tracing turned off
+  this.count = 0;
   
   this.balls = [];    // Array for all the balls
     
@@ -66,6 +70,8 @@ function Raytracer( parent )
   this.imageData          = new ImageData( this.width, this.height );     // Will hold ray traced pixels waiting to be stored in the texture
   
   this.make_menu();
+
+  load_case( 'empty' ); this.parseFile();
 }
 
 Raytracer.prototype.toggle_visible = function() { this.visible = !this.visible; document.getElementById("progress").style = "display:inline-block;" };
@@ -103,11 +109,18 @@ Raytracer.prototype.make_menu = function()      // The buttons
 }
 
 Raytracer.prototype.getDir = function( ix, iy ) {
-  
-  // TODO:  Maps an (x,y) pixel to a corresponding xyz vector that reaches the near plane.  This function, once finished,
-  //        will help cause everything under the "background functions" menu to start working. 
-  
-    return vec4( 0, 0, 1, 0 );    // replace
+ 
+  // calculates the width and height of the view plane based on the given right, left, top and bottom
+  var g_width = this.right - this.left;
+  var g_height = this.top - this.bottom;
+
+  var alpha = ix/(this.width);
+  var beta = iy/(this.height);
+
+  var x = parseFloat(this.left) + alpha*g_width;
+  var y = parseFloat(this.bottom) + beta*g_height;
+
+  return vec4( x, y, -this.near, 0 );    // replace
 }
   
 Raytracer.prototype.trace = function( ray, color_remaining, shadow_test_light_source )
@@ -186,17 +199,18 @@ Raytracer.prototype.display = function(time)
   this.scanlines_per_frame = desired_milliseconds_per_frame / this.milliseconds_per_scanline + 1;
   
   if( !this.visible )  {                         // Raster mode, to draw the same shapes out of triangles when you don't want to trace rays
-    for( i in this.balls )
+    for( i in this.balls ){
         this.m_sphere.draw( this.anim.graphicsState, this.balls[i].model_transform, new Material( this.balls[i].color.concat( 1 ), 
                                                                               this.balls[i].k_a, this.balls[i].k_d, this.balls[i].k_s, this.balls[i].n ) );
+      }
     this.scanline = 0;    document.getElementById("progress").style = "display:none";     return; }; 
   if( !textures["procedural"] || ! textures["procedural"].loaded ) return;      // Don't display until we've got our first procedural image
   
   this.scratchpad_context.drawImage(textures["procedural"].image, 0, 0 );
   this.imageData = this.scratchpad_context.getImageData(0, 0, this.width, this.height );    // Send the newest pixels over to the texture
   var camera_inv = inverse( this.anim.graphicsState.camera_transform );
-   
-  for( var i = 0; i < this.scanlines_per_frame; i++ )     // Update as many scanlines on the picture at once as we can, based on previous frame's speed
+  // console.log(this.scanlines_per_frame);     
+    for( var i = 0; i < this.scanlines_per_frame; i++ )     // Update as many scanlines on the picture at once as we can, based on previous frame's speed
   {
     var y = this.scanline++;
     if( y >= this.height ) { this.scanline = 0; document.getElementById("progress").style = "display:none" };
@@ -207,6 +221,7 @@ Raytracer.prototype.display = function(time)
       this.setColor( x, y, this.trace( ray, vec3( 1, 1, 1 ) ) );                                    // ******** Trace a single ray *********
     }
   }
+
   
   this.scratchpad_context.putImageData( this.imageData, 0, 0);                    // Draw the image on the hidden canvas
   textures["procedural"].image.src = this.scratchpad.toDataURL("image/png");      // Convert the canvas back into an image and send to a texture
@@ -223,6 +238,10 @@ Raytracer.prototype.display = function(time)
   this.m_text .draw( new GraphicsState( mat4(), mat4(), 0 ), model_transform, true, vec4(0,0,0, 1 - time/10000 ) );         
       model_transform = mult( model_transform, translation( 0, -1, 0 ) );
   this.m_text2.draw( new GraphicsState( mat4(), mat4(), 0 ), model_transform, true, vec4(0,0,0, 1 - time/10000 ) );   
+
+ //this.count++;
+ if (this.count > 2)
+  die();
 }
 
 Raytracer.prototype.init_keys = function()   {  shortcut.add( "SHIFT+r", this.toggle_visible.bind( this ) );  }
