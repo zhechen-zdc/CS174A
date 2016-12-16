@@ -17,6 +17,8 @@ Ball.prototype.construct = function()
   // precalculate the inverse transform for easier ray intersection calculations
   this.inverse_transform = inverse(this.model_transform);
 
+  // For some reason after implementing refraction javascript had a memory leak.  I think I was instantiantly too many local variable inside the Balls and javascript wasn't cleanign them up.  
+  // Creating them as prototype variables solved the memory issue.
   this.inverse_ray = {};
   this.vec_S;
   this.vec_c;
@@ -66,6 +68,7 @@ Ball.prototype.intersect = function( ray, existing_intersection, minimum_dist )
     this.t2 = this.negative_B_over_A - Math.sqrt(this.discriminant)/this.abs_c_squared;
   }
 
+  // sort the solutions by min and max
   this.tmin = Math.min(this.t1, this.t2);
   this.tmax = Math.max(this.t1, this.t2);
 
@@ -75,7 +78,7 @@ Ball.prototype.intersect = function( ray, existing_intersection, minimum_dist )
   }
 
   if (this.tmin > minimum_dist)
-    // case where intersect the outer sphere from our side
+    // case where ray intersects the outer sphere from our side
     this.t_final = this.tmin;
   else if (this.tmin < minimum_dist && this.tmax > minimum_dist){
     // case where we are inside the sphere, flip the normal 
@@ -88,7 +91,7 @@ Ball.prototype.intersect = function( ray, existing_intersection, minimum_dist )
     return existing_intersection;
   }
 
-  
+  // update the existing_intersection object with the new updated intersection data
    existing_intersection.ball = this;
    existing_intersection.t = this.t_final;
    var P = add(this.inverse_ray.origin, scale_vec(this.t_final, this.inverse_ray.dir));
@@ -161,8 +164,6 @@ function Raytracer( parent )
   this.make_menu();
 
   this.white = vec3(1, 1, 1);
-
-  load_case( 'testRefract' ); this.parseFile();
 }
 
 Raytracer.prototype.toggle_visible = function() { this.visible = !this.visible; document.getElementById("progress").style = "display:inline-block;" };
@@ -208,23 +209,26 @@ Raytracer.prototype.getDir = function( ix, iy ) {
   var alpha = ix/(this.width);
   var beta = iy/(this.height);
 
+  // interpolate over x and y
   var x = parseFloat(this.left) + alpha*g_width;
   var y = parseFloat(this.bottom) + beta*g_height;
 
-  return vec4( x, y, -this.near, 0 );    // replace
+  return vec4( x, y, -this.near, 0 ); 
 }
   
-Raytracer.prototype.trace = function( ray, color_remaining, is_shadow_test, is_rf, rfCount)
+Raytracer.prototype.trace = function( ray, color_remaining, is_shadow_test, is_rf)
 {
 
   if( length(color_remaining) < .3)    return Color( 0, 0, 0, 1 );  // Is there any remaining potential for brightening this pixel even more?
 
+  // default closest_intersection boject
   var closest_intersection = { 
     ball: null,
     t: Number.POSITIVE_INFINITY,
     normal: null
-  }    // An empty intersection object
+  } 
 
+  //predeclare constants and variables we'll be using
   var ball;
   var vec_c = ray.dir;
   var vec_N, vec_L, vec_V, vec_R;
@@ -234,36 +238,42 @@ Raytracer.prototype.trace = function( ray, color_remaining, is_shadow_test, is_r
 
   // find the closest object intersecting with the input ray
   for(var i =0, iLen = this.balls.length; i < iLen; i++){
+    // if we're shadow testing or if we're using is_rf flag for refraction or reflection, set minimum distance ot 0.0001, otherwise 1
     this.balls[i].intersect(ray, closest_intersection, is_shadow_test || is_rf ? 0.0001 : 1);
     // when we are doing shadow ray test, as soon as there's 1 hit for shadow we can stop calculating for other objects
     if (is_shadow_test && closest_intersection.balls)
       break;
   }
 
-  // if we're doing a shadow test just return the closest distance hit, or null if no object hit
+  // if we're doing a shadow test just return the closest distance hit for slight performance boost, or null if no object hit
   if (is_shadow_test){
     return closest_intersection.ball ? closest_intersection.t : null;
   }
   
+  // if we didn't hit anything, return the background color
   if( !closest_intersection.ball )
     return mult_3_coeffs( this.ambient, background_functions[ curr_background_function ] ( ray ) ).concat(1);     
 
+  // set the variables using the closest intersected ball
   ball = closest_intersection.ball;
   vec_N = closest_intersection.normal;
   point_P = add(ray.origin, scale_vec(closest_intersection.t, ray.dir));
 
 
-  // ambient color
+  // set ambient color
   surface_color = clamp(scale_vec(ball.k_a, ball.color));
  
+  // for each light source...
   for (var i = 0, iLen = this.anim.graphicsState.lights.length; i < iLen; i++){
     light = this.anim.graphicsState.lights[i];
 
+    // create a shadow ray
     shadowRay = {
       origin: point_P, 
       dir: subtract(light.position, point_P)
     };
   
+    // shoot the shadow ray
     shadowHit = this.trace(shadowRay, vec3(1, 1, 1), true);
 
     // if our shadowRay hit something and the distance it hit is between 0.0001 and 1, we can skip the rest of the surface_color from this light source
@@ -271,7 +281,7 @@ Raytracer.prototype.trace = function( ray, color_remaining, is_shadow_test, is_r
       continue;
     }
 
-    // calculate N, L, V, R for diffuse and specular lighting   
+    // if we didn't hit anything, calculate N, L, V, R for diffuse and specular lighting   
     vec_L = normalize(subtract(light.position, point_P));
     vec_N_dot_L = dot(vec_N, vec_L);
     vec_V = normalize(subtract(ray.origin, point_P));
@@ -285,11 +295,12 @@ Raytracer.prototype.trace = function( ray, color_remaining, is_shadow_test, is_r
     surface_color = add(surface_color, mult_3_coeffs(light.color.slice(0.3), add(diffuse_componet, specular_component)));
   }
 
-  // calculate the available reamining color
+  // calculate the available remaining color
   var newColorRemaining = mult_3_coeffs(color_remaining, subtract(this.white, surface_color));
 
+  // if the k_r is 0, don't bother running any reflection code for performance boost
   if (ball.k_r > 0){
-     // create a new reflectin ray
+     // create a new reflection ray
     reflectRay = {
       origin: point_P,
       dir: add(scale_vec(-2 * dot(vec_N, vec_c), vec_N), vec_c)
@@ -300,7 +311,9 @@ Raytracer.prototype.trace = function( ray, color_remaining, is_shadow_test, is_r
   else
     reflectColor = vec3(0, 0, 0);
 
+  // if the k_refract is 0, don't bother running any refraction code for performance boost
   if (ball.k_refract > 0){
+    // create a new refraction ray using snell's law converted to vectors
     var small_l = normalize(ray.dir);
     var small_c = -1 * dot(vec_N, small_l);
 
@@ -311,14 +324,13 @@ Raytracer.prototype.trace = function( ray, color_remaining, is_shadow_test, is_r
       dir: add(scale_vec(ball.refract_index, small_l), scale_vec(ball.refract_index*small_c - Math.sqrt(discriminant), vec_N))
     }
  
-
-    refractTrace = this.trace(refractRay, scale_vec(ball.k_refract, newColorRemaining), false, true, rfCount - 1);
+    refractTrace = this.trace(refractRay, scale_vec(ball.k_refract, newColorRemaining), false, true);
     refractColor = clamp(scale_vec(ball.k_refract, refractTrace.slice(0, 3)));
   }
   else 
     refractColor = vec3(0, 0, 0)
   
-  //pixel_color = surface_color;
+  //pixel_color = surface_color + (white - surface_color) (reflect + refract);
   pixel_color = add(surface_color, mult_3_coeffs(subtract(this.white, surface_color), add(reflectColor, refractColor)));
 
   return clamp(pixel_color);
@@ -401,7 +413,7 @@ Raytracer.prototype.display = function(time)
     for ( var x = 0; x < this.width; x++ )
     {
       var ray = { origin: mult_vec( camera_inv, vec4( 0, 0, 0, 1 ) ), dir: mult_vec( camera_inv, this.getDir( x, y ) ) };   // Apply camera
-      this.setColor( x, y, this.trace( ray, vec3(1, 1, 1) , false, false, 4) );                                    // ******** Trace a single ray *********
+      this.setColor( x, y, this.trace( ray, vec3(1, 1, 1) ) );                                    // ******** Trace a single ray *********
     }
   }
 
